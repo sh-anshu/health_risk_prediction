@@ -1,0 +1,323 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#0d6efd">
+
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Diabetes Predictor — Interactive</title>
+
+  <!-- Bootstrap & FontAwesome -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet"/>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet"/>
+
+  <!-- Plotly -->
+  <script src="https://cdn.plot.ly/plotly-2.24.1.min.js"></script>
+
+  <style>
+    :root{
+      --accent: #0d6efd;
+      --bg-1: linear-gradient(180deg,#eef6ff 0%, #f9fbff 100%);
+      --card: #ffffff;
+      --muted: #6c757d;
+      --glass: rgba(255,255,255,0.6);
+    }
+    [data-theme="dark"]{
+      --accent: #66a6ff;
+      --bg-1: linear-gradient(180deg,#071026 0%, #021024 100%);
+      --card: #071025;
+      --muted: #9aa4b2;
+      color: #e6eef8;
+    }
+
+    html,body{height:100%; margin:0; font-family:Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial; background:var(--bg-1)}
+
+    .container { max-width:1100px }
+    .app-card{ background:var(--card); border-radius:14px; padding:18px; box-shadow:0 10px 30px rgba(13,45,97,.06); transition:transform .18s ease, box-shadow .18s ease }
+    .app-card:hover{ transform:translateY(-4px) }
+
+    .app-title{ font-size:20px; font-weight:700; color:var(--accent) }
+    .small-muted{ color:var(--muted); font-size:.95rem }
+
+    /* form controls */
+    .form-control:focus, .form-select:focus{ box-shadow:0 10px 25px rgba(13,110,253,.06); border-color:var(--accent) }
+
+    /* result card */
+    .result-box{ border-radius:12px; padding:14px; background:linear-gradient(180deg, rgba(255,255,255,0.9), rgba(255,255,255,0.7)); box-shadow:0 8px 30px rgba(13,45,97,0.04); transition:all .25s cubic-bezier(.2,.9,.2,1); }
+    [data-theme="dark"] .result-box{ background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01)); box-shadow: none }
+    .result-box.hidden { opacity:0; transform:translateY(8px) scale(.995); pointer-events:none }
+
+    .risk-pill{ font-weight:700; font-size:1rem }
+
+    /* history */
+    .history-item{ border-left:4px solid transparent; padding:10px; border-radius:8px; background:transparent; margin-bottom:10px; transition:background .12s }
+    .history-item:hover{ background: rgba(0,0,0,0.03) }
+
+    /* micro UI */
+    .preset-btn{ border-radius:999px; padding:6px 10px; font-size:.9rem }
+
+    /* responsive tweaks */
+    @media(min-width:992px){ .left-col{ max-width:560px } }
+
+    /* subtle input error */
+    .is-invalid { border-color:#dc3545 !important; box-shadow:0 6px 18px rgba(220,53,69,.06) !important }
+
+    /* animation for progress */
+    .progress-bar { transition: width .9s ease; }
+
+    /* modal report */
+    .report-pre { white-space:pre-wrap; background: rgba(0,0,0,0.03); padding:12px; border-radius:8px }
+
+    /* utility */
+    .muted-sm{ color:var(--muted); font-size:.85rem }
+    .fab-ghost{ background:transparent; border:1px solid rgba(0,0,0,0.06); border-radius:10px; padding:8px }
+
+  </style>
+</head>
+<body data-theme="{{ request.cookies.get('dp_theme','light') }}">
+  <div class="container py-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <div class="d-flex align-items-center gap-3">
+        <h1 class="app-title mb-0"><i class="fa-solid fa-heart-pulse"></i> Diabetes Predictor</h1>
+        <div class="muted-sm">Signed in as <strong>{{ user if user else 'Guest' }}</strong></div>
+      </div>
+
+      <div class="d-flex align-items-center gap-2">
+        <button id="themeToggle" class="btn btn-sm btn-outline-secondary" title="Toggle dark mode"><i class="fa-solid fa-moon"></i></button>
+        <a href="{{ url_for('logout') }}" class="btn btn-sm btn-outline-danger">Logout</a>
+      </div>
+    </div>
+
+    <div class="row g-4">
+      <!-- left -->
+      <div class="col-12 col-lg-6 left-col">
+        <div class="app-card">
+
+          <ul class="nav nav-pills mb-3" id="modeTabs">
+            <li class="nav-item"><button class="nav-link active" data-bs-target="#labMode">Lab Data</button></li>
+            <li class="nav-item"><button class="nav-link" data-bs-target="#generalMode">General Check</button></li>
+          </ul>
+
+          <div class="tab-content">
+            <div id="labMode" class="tab-pane show active">
+              <form id="labForm" novalidate>
+                <label class="form-label mt-1">Glucose Level</label>
+                <input name="glucose" id="glucose" type="number" step="any" class="form-control" placeholder="e.g. 120" required>
+
+                <div class="d-flex gap-2 mt-2 align-items-center">
+                  <label class="form-label mb-0">Presets</label>
+                  <div>
+                    <button type="button" data-preset='{"glucose":90,"bloodpressure":70,"insulin":80,"age":30}' class="btn btn-sm btn-outline-primary preset-btn">Healthy</button>
+                    <button type="button" data-preset='{"glucose":140,"bloodpressure":85,"insulin":110,"age":55}' class="btn btn-sm btn-outline-warning preset-btn">At-risk</button>
+                  </div>
+                </div>
+
+                <label class="form-label mt-2">Blood Pressure</label>
+                <input name="bloodpressure" id="bp" type="number" step="any" class="form-control" placeholder="e.g. 72" required>
+
+                <label class="form-label mt-2">Insulin</label>
+                <input name="insulin" id="insulin" type="number" step="any" class="form-control" placeholder="e.g. 85" required>
+
+                <label class="form-label mt-2">Age</label>
+                <input name="age" id="age" type="number" step="1" class="form-control" placeholder="e.g. 45" required>
+
+                <div class="d-flex gap-2 mt-3">
+                  <button id="labSubmit" class="btn btn-primary flex-grow-1" type="submit"><span id="labBtnText"><i class="fa-solid fa-magnifying-glass-chart"></i> Predict</span></button>
+                  <button id="labClear" type="button" class="btn btn-outline-secondary">Clear</button>
+                </div>
+              </form>
+            </div>
+
+            <div id="generalMode" class="tab-pane">
+              <form id="generalForm" novalidate>
+                <label class="form-label mt-1">Are you overweight or obese?</label>
+                <select name="obese" class="form-select" required><option value="">Choose</option><option value="1">Yes</option><option value="0">No</option></select>
+
+                <label class="form-label mt-2">Do you feel tired often?</label>
+                <select name="tired" class="form-select" required><option value="">Choose</option><option value="1">Yes</option><option value="0">No</option></select>
+
+                <label class="form-label mt-2">Frequent urination?</label>
+                <select name="urination" class="form-select" required><option value="">Choose</option><option value="1">Yes</option><option value="0">No</option></select>
+
+                <label class="form-label mt-2">Excessive thirst or hunger?</label>
+                <select name="thirst" class="form-select" required><option value="">Choose</option><option value="1">Yes</option><option value="0">No</option></select>
+
+                <label class="form-label mt-2">Family history of diabetes?</label>
+                <select name="family" class="form-select" required><option value="">Choose</option><option value="1">Yes</option><option value="0">No</option></select>
+
+                <div class="d-flex gap-2 mt-3">
+                  <button id="generalSubmit" class="btn btn-warning flex-grow-1" type="submit"><span id="genBtnText"><i class="fa-solid fa-chart-line"></i> Predict</span></button>
+                  <button id="genClear" type="button" class="btn btn-outline-secondary">Clear</button>
+                </div>
+              </form>
+            </div>
+          </div>
+
+          <div id="resultArea" class="mt-4" aria-live="polite">
+            <div id="resultCard" class="result-box hidden">
+              <div class="d-flex justify-content-between align-items-start">
+                <div>
+                  <div id="resultText" class="result-text h5 mb-1"></div>
+                  <div id="resultMessage" class="small-muted"></div>
+                </div>
+                <div style="width:150px; height:140px;">
+                  <div id="donut" style="width:150px;height:140px;"></div>
+                </div>
+              </div>
+
+              <div id="riskBar" class="mt-3">
+                <label class="small-muted mb-1">Estimated Risk</label>
+                <div class="progress" style="height:20px">
+                  <div id="riskProgress" class="progress-bar" role="progressbar" style="width:0%">0%</div>
+                </div>
+              </div>
+
+              <div id="adviceSection" class="mt-3"></div>
+
+              <div class="d-flex gap-2 mt-3">
+                <button id="downloadReport" class="btn btn-outline-primary download-btn"><i class="fa-solid fa-download"></i> Download</button>
+                <button id="shareReport" class="btn btn-outline-secondary" id="shareBtn"><i class="fa-solid fa-share-nodes"></i> Share</button>
+                <button id="viewReport" class="btn btn-sm btn-outline-dark ms-auto">View Report</button>
+              </div>
+            </div>
+            <div id="noResult" class="small-muted">Enter values above and click Predict. Use presets for quick checks.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- right -->
+      <div class="col-12 col-lg-6">
+        <div class="app-card">
+          <h5 class="mb-2">Your recent checks</h5>
+          <div id="historyList" class="mb-3">
+            <div class="small-muted">No recent checks yet.</div>
+          </div>
+
+          <hr/>
+
+          <div class="d-flex gap-2">
+            <a href="{{ url_for('admin') }}" class="btn btn-sm btn-outline-primary">User Dashboard</a>
+            <button class="btn btn-sm btn-outline-secondary" id="clearHistory">Clear local cache</button>
+          </div>
+
+          <div class="mt-4 small-muted">
+            <strong>Tips:</strong> If you don’t know lab values, use General Check. This app is a guide — not a diagnosis.
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Modal: Report -->
+  <div class="modal fade" id="reportModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Diabetes Check Report</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <div id="reportContent" class="report-pre"></div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+          <button id="copyReport" type="button" class="btn btn-primary">Copy</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bootstrap -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+  <script>
+    // ---------- helpers ----------
+    function showSpinnerOnBtn(btn, textId){ btn.disabled = true; const t = document.getElementById(textId); t.innerHTML = '<span class="spinner-grow spinner-grow-sm" role="status" aria-hidden="true"></span> Loading...'; }
+    function restoreBtn(btn, html){ btn.disabled = false; btn.querySelector('span').innerHTML = html; }
+
+    function animateShowResult(){ const c = document.getElementById('resultCard'); c.classList.remove('hidden'); document.getElementById('noResult').classList.add('d-none'); }
+
+    function showResult(payload){
+      document.getElementById('resultText').textContent = payload.prediction_text || '';
+      document.getElementById('resultMessage').textContent = payload.advice ? payload.advice.message : '';
+
+      // advice
+      const adv = document.getElementById('adviceSection'); adv.innerHTML = '';
+      if (payload.advice){ const doList = payload.advice.do || []; const dontList = payload.advice.dont || []; let html = '<div class="mt-2"><strong>✅ Do:</strong><ul class="advice-list">'; doList.forEach(i=> html += `<li>${i}</li>`); html += '</ul></div>'; html += '<div class="mt-2"><strong>🚫 Avoid:</strong><ul class="advice-list">'; dontList.forEach(i=> html += `<li>${i}</li>`); html += '</ul></div>'; adv.innerHTML = html; }
+
+      // risk
+      const risk = Number(payload.risk_level || 0);
+      const progress = document.getElementById('riskProgress');
+      progress.style.width = risk + '%'; progress.textContent = risk + '%';
+      progress.className = 'progress-bar ' + (risk < 40 ? 'bg-success' : (risk < 80 ? 'bg-warning' : 'bg-danger'));
+
+      // donut
+      const donut = document.getElementById('donut'); const remain = Math.max(0, 100 - risk);
+      const trace = [{ values:[risk, remain], labels:['Risk','Safe'], hole:.6, type:'pie', marker:{colors:[risk < 80 ? '#f44336' : '#b71c1c', '#e9eef8']}, textinfo:'none' }];
+      const layout = { margin:{t:0,b:0,l:0,r:0}, showlegend:false, height:140, width:150 };
+      Plotly.react(donut, trace, layout, {displayModeBar:false});
+
+      window._lastReport = payload; animateShowResult();
+    }
+
+    async function postJson(url, data){
+      const res = await fetch(url, { method:'POST', headers:{'Content-Type':'application/json','X-Requested-With':'XMLHttpRequest'}, body:JSON.stringify(data) });
+      if (!res.ok){ const txt = await res.text().catch(()=>null); throw new Error(txt || 'Server error'); }
+      return await res.json();
+    }
+
+    // ---------- wiring ----------
+    document.addEventListener('DOMContentLoaded', ()=>{
+      // tabs
+      const tabEls = document.querySelectorAll('[data-bs-target]'); tabEls.forEach(btn=> btn.addEventListener('click', (e)=>{ tabEls.forEach(b=> b.classList.remove('active')); btn.classList.add('active'); document.querySelectorAll('.tab-pane').forEach(p=> p.classList.remove('show','active')); document.querySelector(btn.dataset.bsTarget).classList.add('show','active'); }));
+
+      // presets
+      document.querySelectorAll('[data-preset]').forEach(b=> b.addEventListener('click', ()=>{ const p = JSON.parse(b.dataset.preset); for (const k in p) { const el = document.querySelector(`[name="${k}"]`); if (el) el.value = p[k]; } }));
+
+      // form submits
+      const labForm = document.getElementById('labForm'); const labBtn = document.getElementById('labSubmit');
+      labForm.addEventListener('submit', async (ev)=>{ ev.preventDefault(); const fd = new FormData(labForm); const payload = Object.fromEntries(fd.entries()); // client validation
+        for (const k of ['glucose','bloodpressure','insulin','age']){ if (!payload[k] || isNaN(Number(payload[k]))){ const el=document.querySelector(`[name="${k}"]`); el.classList.add('is-invalid'); setTimeout(()=>el.classList.remove('is-invalid'),1500); return alert('Please enter valid numbers for all lab fields.'); } }
+        showSpinnerOnBtn(labBtn, 'labBtnText'); try{ const res = await postJson('{{ url_for("api_predict") }}', payload); showResult(res); await refreshHistory(); } catch(err){ alert('Error: '+err.message); } finally{ labBtn.disabled = false; document.getElementById('labBtnText').innerHTML = '<i class="fa-solid fa-magnifying-glass-chart"></i> Predict'; } });
+
+      document.getElementById('labClear').addEventListener('click', ()=> labForm.reset());
+
+      const genForm = document.getElementById('generalForm'); const genBtn = document.getElementById('generalSubmit');
+      genForm.addEventListener('submit', async (ev)=>{ ev.preventDefault(); const fd = new FormData(genForm); const payload = Object.fromEntries(fd.entries()); for (const key of ['obese','tired','urination','thirst','family']) if (!(key in payload) || payload[key] === '') return alert('Please answer all questions.'); showSpinnerOnBtn(genBtn, 'genBtnText'); try{ const res = await postJson('{{ url_for("api_general_predict") }}', payload); showResult(res); await refreshHistory(); } catch(err){ alert('Error: '+err.message); } finally{ genBtn.disabled = false; document.getElementById('genBtnText').innerHTML = '<i class="fa-solid fa-chart-line"></i> Predict'; } });
+
+      document.getElementById('genClear').addEventListener('click', ()=> genForm.reset());
+
+      document.getElementById('downloadReport').addEventListener('click', ()=>{ const payload = window._lastReport; if (!payload) return alert('No report available yet.'); const lines = ['Diabetes Check Report','---------------------',`User: {{ user if user else "Guest" }}`,`Prediction: ${payload.prediction_text || ''}`,`Risk: ${payload.risk_level || 0}%`,`Time: ${new Date().toLocaleString()}`,'','Advice:',...(payload.advice?['Do:'].concat(payload.advice.do||[],['Avoid:']).concat(payload.advice.dont||[]):[])]; const blob = new Blob([lines.join('\n')], { type:'text/plain' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href=url; a.download='diabetes_report.txt'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url); });
+
+      // share
+      document.getElementById('shareBtn').addEventListener('click', async ()=>{ const payload = window._lastReport; if (!payload) return alert('No report to share'); const text = `Diabetes Check - ${payload.prediction_text} | Risk: ${payload.risk_level}%`; if (navigator.share) { try { await navigator.share({ title:'Diabetes Check', text }); } catch(e){} } else { await navigator.clipboard.writeText(text); alert('Report copied to clipboard'); } });
+
+      // view report modal
+      const reportModal = new bootstrap.Modal(document.getElementById('reportModal'));
+      document.getElementById('viewReport').addEventListener('click', ()=>{ const payload = window._lastReport; if (!payload) return alert('No report yet'); const lines = [`User: {{ user if user else "Guest" }}`,`Prediction: ${payload.prediction_text || ''}`,`Risk: ${payload.risk_level || 0}%`,`Time: ${new Date().toLocaleString()}`,'','Advice:','Do: ',...(payload.advice?payload.advice.do||[]:[]),'Avoid: ',...(payload.advice?payload.advice.dont||[]:[])]; document.getElementById('reportContent').textContent = lines.join('\n'); reportModal.show(); });
+      document.getElementById('copyReport').addEventListener('click', ()=>{ const txt = document.getElementById('reportContent').textContent; navigator.clipboard.writeText(txt).then(()=> alert('Copied')); });
+
+      // theme toggle
+      const themeToggle = document.getElementById('themeToggle'); themeToggle.addEventListener('click', ()=>{ const cur = document.body.getAttribute('data-theme') || 'light'; const next = cur==='light'?'dark':'light'; document.body.setAttribute('data-theme', next); localStorage.setItem('dp_theme', next); document.cookie = `dp_theme=${next}; path=/`; });
+
+      // history
+      refreshHistory();
+
+    }); // DOMContentLoaded end
+
+    async function refreshHistory(){ try{ const res = await fetch('{{ url_for("api_history") }}'); if (!res.ok) throw new Error('History not available'); const json = await res.json(); showHistory(json); } catch(e){ /* ignore */ } }
+
+    function showHistory(items){ const container = document.getElementById('historyList'); container.innerHTML=''; if (!items || items.length===0){ container.innerHTML = '<div class="small-muted">No recent checks yet.</div>'; return; } items.forEach(it=>{ const div = document.createElement('div'); div.className = 'history-item d-flex justify-content-between'; div.innerHTML = `<div><strong>${it.username}</strong><div class="time muted-sm">${it.timestamp}</div></div><div><span class="badge ${it.risk>=80?'bg-danger':(it.risk>=50?'bg-warning text-dark':'bg-success')}">${it.risk}%</span></div>`; container.appendChild(div); }); }
+
+  </script>
+  <script>
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/static/service-worker.js')
+      .catch(()=>{});
+  }
+</script>
+
+</body>
+</html>

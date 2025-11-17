@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Login — Diabetes Predictor</title>
+
+  <!-- Bootstrap -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet"/>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet"/>
+
+  <style>
+    :root{
+      --bg1: #f6f9ff;
+      --bg2: #eef6ff;
+      --card: #ffffff;
+      --accent: #2563eb;
+      --muted: #6b7280;
+    }
+    html,body{height:100%}
+    body{
+      background: linear-gradient(135deg,var(--bg1),var(--bg2));
+      font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+      -webkit-font-smoothing:antialiased;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      padding:32px;
+    }
+    .auth-wrap{
+      width:100%;
+      max-width:940px;
+      display:grid;
+      grid-template-columns: 1fr 420px;
+      gap:28px;
+      align-items:center;
+    }
+    .promo {
+      background: linear-gradient(180deg,#fff 0%, rgba(245,251,255,0.7));
+      border-radius:16px;
+      padding:28px;
+      box-shadow: 0 10px 30px rgba(15,23,42,0.06);
+    }
+    .promo h2{color:var(--accent); font-weight:700; margin-bottom:8px}
+    .promo p{color:var(--muted); line-height:1.5}
+    .promo .brand {
+      display:inline-flex;
+      align-items:center;
+      gap:10px;
+      font-weight:700;
+      color:var(--accent);
+      text-decoration:none;
+    }
+    .auth-card{
+      background:var(--card);
+      padding:26px;
+      border-radius:14px;
+      box-shadow:0 12px 30px rgba(10,20,60,0.06);
+      border: 1px solid rgba(16,24,40,0.03);
+    }
+    .auth-card h3{font-size:20px; margin-bottom:6px}
+    .small-muted{color:var(--muted); font-size:0.9rem}
+    .form-control:focus{ box-shadow:0 10px 25px rgba(37,99,235,0.06); border-color:var(--accent); }
+    .btn-primary{ background:var(--accent); border:none; box-shadow: 0 10px 18px rgba(37,99,235,0.08); }
+    .divider { height:1px; background:linear-gradient(90deg, transparent, rgba(0,0,0,0.04), transparent); margin:18px 0; border-radius:2px }
+    .helper { font-size:0.9rem; color:var(--muted) }
+    .oauth-row .btn{ flex:1 1 0; }
+    .error { color:#b91c1c; font-weight:600; font-size:0.95rem; margin-top:6px }
+    .password-toggle { cursor:pointer; color: #475569; }
+    @media (max-width:980px){
+      .auth-wrap{ grid-template-columns: 1fr; max-width:520px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="auth-wrap">
+    <!-- left promo -->
+    <div class="promo">
+      <a class="brand" href="{{ url_for('home') }}" aria-label="Go home">
+        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" style="filter:drop-shadow(0 4px 10px rgba(37,99,235,0.06))">
+          <rect width="24" height="24" rx="8" fill="#eaf4ff"></rect>
+          <path d="M12 7v10M7 12h10" stroke="#2563eb" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        Diabetes Predictor
+      </a>
+
+      <h2>Sign in securely</h2>
+      <p class="small-muted">Access your past results, save new checks, and get personalised advice. We never share your data.</p>
+
+      <div class="divider"></div>
+
+      <div class="mt-3">
+        <strong class="small-muted">Why sign in?</strong>
+        <ul class="helper mt-2">
+          <li>Save your history and track changes</li>
+          <li>Download personalised reports</li>
+          <li>Access on any device</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- right auth card -->
+    <div class="auth-card" role="main" aria-labelledby="loginTitle">
+      <h3 id="loginTitle">Welcome back</h3>
+      <p class="small-muted">Enter your credentials to continue</p>
+
+      <form id="loginForm" method="post" action="{{ url_for('login') }}" class="mt-3" novalidate>
+        <div class="mb-3">
+          <label class="form-label">Email</label>
+          <input name="email" type="email" class="form-control" placeholder="Enter your Email " required value="{{ request.form.email or '' }}">
+        </div>
+
+        <div class="mb-2">
+          <label class="form-label">Password</label>
+          <div class="input-group">
+            <input name="password" id="passwordInput" type="password" class="form-control" placeholder="Enter password" required>
+            <span class="input-group-text password-toggle" id="togglePw" title="Show / hide password"><i class="fa-regular fa-eye"></i></span>
+          </div>
+        </div>
+
+        {% if error %}
+          <div class="error">{{ error }}</div>
+        {% endif %}
+
+        <div class="d-flex justify-content-between align-items-center mt-3 mb-3">
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" name="remember" id="remember">
+            <label class="form-check-label small-muted" for="remember">Remember me</label>
+          </div>
+          <a href="#" class="small-muted">Forgot password?</a>
+        </div>
+
+        <button class="btn btn-primary w-100" type="submit" aria-live="polite">
+          <i class="fa-solid fa-right-to-bracket me-2"></i> Sign in
+        </button>
+
+        <div class="divider"></div>
+
+        <div class="text-center small-muted">Or sign in with</div>
+        <div class="d-flex gap-2 mt-3 oauth-row">
+          <button type="button" class="btn btn-outline-secondary"><i class="fa-brands fa-google me-2"></i> Google</button>
+          <button type="button" class="btn btn-outline-secondary"><i class="fa-brands fa-gmail me-2"></i> Gmail</button>
+        </div>
+
+        <p class="helper mt-3 text-center">New here? <a href="{{ url_for('signup') }}">Create an account</a></p>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    // simple show/hide password
+    document.getElementById('togglePw').addEventListener('click', function(){
+      const inp = document.getElementById('passwordInput');
+      const icon = this.querySelector('i');
+      if (inp.type === 'password'){ inp.type = 'text'; icon.classList.remove('fa-eye'); icon.classList.add('fa-eye-slash'); }
+      else { inp.type = 'password'; icon.classList.remove('fa-eye-slash'); icon.classList.add('fa-eye'); }
+    });
+
+    // tiny client validation on submit to avoid blank posts
+    document.getElementById('loginForm').addEventListener('submit', function(e){
+      const em = this.email.value.trim();
+      const pw = this.password.value.trim();
+      if (!em || !pw) {
+        e.preventDefault();
+        alert('Please enter both email and password.');
+      }
+    });
+  </script>
+</body>
+</html>

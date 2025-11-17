@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Create account — Diabetes Predictor</title>
+
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet"/>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet"/>
+
+  <style>
+    :root{ --bg:#f5f8ff; --card:#fff; --accent:#0066ff; --muted:#6b7280; }
+    [data-theme="dark"]{ --bg:#071025; --card:#071025; --accent:#4da3ff; --muted:#9aa4b2; color:#e6eef8; }
+    html,body{height:100%; margin:0; font-family:Inter,system-ui,Arial}
+    body{background:var(--bg); display:flex; align-items:center; justify-content:center; padding:28px}
+    .box{ width:100%; max-width:920px; display:grid; grid-template-columns:1fr 420px; gap:20px; align-items:center }
+    .promo{ padding:22px; border-radius:12px; background:linear-gradient(180deg,#fff,#fbfdff); box-shadow:0 12px 30px rgba(12,24,64,0.06) }
+    .card{ background:var(--card); padding:20px; border-radius:12px; box-shadow:0 10px 28px rgba(10,20,40,0.06) }
+    h3{ color:var(--accent); margin-bottom:6px }
+    .small-muted{ color:var(--muted) }
+    .form-control:focus{ box-shadow:0 8px 24px rgba(0,102,255,0.06); border-color:var(--accent); }
+    @media (max-width:920px){ .box{ grid-template-columns:1fr; max-width:520px } }
+  </style>
+</head>
+<body data-theme="{{ request.cookies.get('dp_theme','light') }}">
+
+  <div class="box container">
+    <div class="promo">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px">
+        <div style="width:44px;height:44px;border-radius:10px;background:linear-gradient(135deg,var(--accent),#00b0ff);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700">DP</div>
+        <div>
+          <div style="font-weight:700">Diabetes Predictor</div>
+          <div class="small-muted">Create an account to save and track your checks</div>
+        </div>
+      </div>
+
+      <h4>Why sign up?</h4>
+      <ul class="small-muted">
+        <li>Save check history and download reports</li>
+        <li>Access from any device</li>
+        <li>Keep track of improvements over time</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h3>Create account</h3>
+      <p class="small-muted">We’ll only ask for necessary details.</p>
+
+      <form id="signupForm" method="post" action="{{ url_for('signup') }}" novalidate>
+        <div class="mb-3">
+          <label class="form-label">Full name</label>
+          <input name="name" class="form-control" type="text" placeholder="Your full name" required value="{{ request.form.name or '' }}">
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label">Email</label>
+          <input name="email" class="form-control" type="email" placeholder="you@domain.com" required value="{{ request.form.email or '' }}">
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label">Password</label>
+          <div class="input-group">
+            <input name="password" id="password" class="form-control" type="password" placeholder="Create a password" required>
+            <span class="input-group-text password-toggle" id="togglePw"><i class="fa-regular fa-eye"></i></span>
+          </div>
+          <div class="small-muted mt-1">Use at least 8 characters with letters and numbers.</div>
+        </div>
+
+        {% if error %}
+          <div class="alert alert-danger">{{ error }}</div>
+        {% endif %}
+
+        <button class="btn btn-primary w-100" type="submit"><i class="fa-solid fa-user-plus me-2"></i> Create account</button>
+
+        <p class="small-muted mt-3 text-center">Already have an account? <a href="{{ url_for('login') }}">Sign in</a></p>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    // theme
+    const themeKey = 'dp_theme';
+    function setTheme(t){ document.body.setAttribute('data-theme', t); localStorage.setItem(themeKey,t); document.cookie = `dp_theme=${t}; path=/`; }
+    // toggle via saved cookie if present
+    const saved = localStorage.getItem(themeKey) || '{{ request.cookies.get("dp_theme","light") }}';
+    if (saved) setTheme(saved);
+
+    // password toggle
+    document.getElementById('togglePw').addEventListener('click', function(){
+      const pw = document.getElementById('password');
+      const icon = this.querySelector('i');
+      if (pw.type === 'password'){ pw.type='text'; icon.classList.remove('fa-eye'); icon.classList.add('fa-eye-slash'); }
+      else { pw.type='password'; icon.classList.remove('fa-eye-slash'); icon.classList.add('fa-eye'); }
+    });
+
+    // client validation
+    document.getElementById('signupForm').addEventListener('submit', function(e){
+      const name = this.name.value.trim(), email = this.email.value.trim(), pw = this.password.value;
+      if (!name || !email || !pw) { e.preventDefault(); alert('Please fill all fields.'); return; }
+      if (pw.length < 8) { e.preventDefault(); alert('Password must be at least 8 characters.'); return; }
+    });
+  </script>
+</body>
+</html>
